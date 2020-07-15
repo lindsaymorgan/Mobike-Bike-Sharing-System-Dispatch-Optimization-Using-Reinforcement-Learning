@@ -14,7 +14,7 @@ EPSILON = 0.9
 GAMMA = 0.9
 LR = 0.01
 MEMORY_CAPACITY = 2000
-Q_NETWORK_ITERATION = 100
+Q_NETWORK_ITERATION = 1000
 BATCH_SIZE = 32
 
 EPISODES = 400
@@ -97,16 +97,16 @@ class Net(nn.Module):
         EMB_SIZE = 128
         OTHER_SIZE = NUM_STATES  # fixme: update this value based on the input
 
-        self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * 2, 256)
+        self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * 2, 256).cuda()
         self.fc1.weight.data.normal_(0, 0.1)
-        self.fc2 = nn.Linear(256, 1)
+        self.fc2 = nn.Linear(256, 1).cuda()
         self.fc2.weight.data.normal_(0, 0.1)
 
-        self.emb = nn.Embedding(NUM_STATES, EMB_SIZE)
+        self.emb = nn.Embedding(NUM_STATES, EMB_SIZE).cuda()
 
-    def forward(self, x: torch.FloatTensor, stations: torch.LongTensor):
-        emb = self.emb(stations).flatten()
-        x = torch.cat([x, emb])
+    def forward(self, x: torch.cuda.FloatTensor, stations: torch.cuda.LongTensor):
+        emb = self.emb(stations).flatten(start_dim=1)
+        x = torch.cat([x, emb],1)
         x = self.fc1(x)
         x = F.relu(x)
         x = self.fc2(x)
@@ -159,11 +159,11 @@ class Dqn():
                 move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
                 region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
 
-                x=torch.FloatTensor(np.append(np.append(a_t,bike_num_t),move))  #区块单车量，时刻t，搬运量
-                station=torch.LongTensor(np.array([v_pos,region]))  #货车所在区域编号，目的区域编号
+                x=torch.FloatTensor([np.append(np.append(a_t,bike_num_t),move)]).cuda()  #区块单车量，时刻t，搬运量
+                station=torch.LongTensor([np.array([v_pos,region])]).cuda()  #货车所在区域编号，目的区域编号
 
                 action_value = self.eval_net.forward(x,station)
-                tmp_value.append(action_value.detach().numpy()[0])
+                tmp_value.append(action_value.cpu().detach().numpy()[0])
             max_indice=[i for i, j in enumerate(tmp_value) if j == max(tmp_value)] #找最大index
             action=feasible_action[random.choice(max_indice)] #如果有多个index随机选一个，获得对应action
             # action = torch.max(action_value, 1)[1].data.numpy() # get action whose q is max
@@ -194,12 +194,12 @@ class Dqn():
             move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
             region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
 
-            x = torch.FloatTensor(np.append(np.append(a_t, bike_num_t), move))
-            station = torch.LongTensor(np.array([v_pos, region]))
+            x = torch.FloatTensor([np.append(np.append(a_t, bike_num_t), move)]).cuda()
+            station = torch.LongTensor([np.array([v_pos, region])]).cuda()
 
             action_value = self.eval_net.forward(x, station)
             tmp_value.append(action_value)
-        max_indice = [i for i, j in enumerate(a) if j == max(tmp_value)]  # 找最大index
+        max_indice = [i for i, j in enumerate(tmp_value) if j == max(tmp_value)]  # 找最大index
         action = feasible_action[random.choice(max_indice)]  # 如果有多个index随机选一个，获得对应action
         # state = torch.unsqueeze(torch.FloatTensor(state) ,0)
         #
@@ -226,15 +226,56 @@ class Dqn():
 
         #切取sars切片
         batch_memory = self.memory[sample_index, :]
-        batch_state = torch.FloatTensor(batch_memory[:, :self.NUM_STATES])
+        batch_state = torch.FloatTensor(batch_memory[:, :self.NUM_STATES]).cuda()
         #note that the action must be a int
-        batch_action = torch.LongTensor(batch_memory[:, self.NUM_STATES:self.NUM_STATES+1].astype(int))
-        batch_reward = torch.FloatTensor(batch_memory[:, self.NUM_STATES+1: self.NUM_STATES+2])
-        batch_next_state = torch.FloatTensor(batch_memory[:, -self.NUM_STATES:])
+        batch_action = torch.LongTensor(batch_memory[:, self.NUM_STATES:self.NUM_STATES+1].astype(int)).cuda()
+        batch_reward = torch.FloatTensor(batch_memory[:, self.NUM_STATES+1: self.NUM_STATES+2]).cuda()
+        batch_next_state = torch.FloatTensor(batch_memory[:, -self.NUM_STATES:]).cuda()
 
-        q_eval = self.eval_net(batch_state).gather(1, batch_action)
-        q_next = self.target_net(batch_next_state).detach()
-        q_target = batch_reward + GAMMA*q_next.max(1)[0].view(BATCH_SIZE, 1)
+        x=torch.cat((batch_state[:,:4],batch_state[:,-2:]),1)
+        move=torch.FloatTensor([[i[0]% (2 * self.move_amount_limit + 1) - self.move_amount_limit] for i in batch_action.cpu().detach().numpy()]).cuda()
+        x = torch.cat((x, move), 1)
+
+        y=torch.LongTensor([[i] for i in batch_state[:,4].cpu().detach().numpy()]).cuda()
+        region = torch.LongTensor([[int(np.floor(i[0] / (2 * self.move_amount_limit + 1)))] for i in batch_action.cpu().detach().numpy()]).cuda()
+        y=torch.cat((y,region),1)
+
+        q_eval = self.eval_net(x, y)
+        # q_next = self.target_net(batch_next_state).detach()
+
+        tmp_q_next=list()
+        for i in batch_next_state:
+            state=i.cpu().detach().numpy()
+            feasible_action = list()
+            for action in range(self.NUM_ACTIONS):
+                move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+                region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
+                if move + state[region] >= 0 and move <= state[-1]:
+                    feasible_action.append(action)
+
+            tmp_x=list()
+            tmp_y=list()
+            # 对每个feasible action算value
+            a_t = state[: - 3]
+            v_pos = state[- 3]
+            bike_num_t = state[-2:]
+            for action in feasible_action:
+                move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+                region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
+
+                tmp_x.append(np.append(np.append(a_t, bike_num_t), move))
+                tmp_y.append(np.array([v_pos, region]))
+
+            x = torch.FloatTensor(tmp_x).cuda()
+            station = torch.LongTensor(tmp_y).cuda()
+
+            action_val = self.target_net.forward(x, station)
+            tmp_q_next.append(float(action_val.max(1)[0].max().cpu().detach().numpy()))
+
+        q_next=torch.FloatTensor(tmp_q_next).cuda()
+
+        # q_target = batch_reward + GAMMA*q_next.max(1)[0].view(BATCH_SIZE, 1)
+        q_target = batch_reward + GAMMA * q_next
 
         loss = self.loss(q_eval, q_target)
         self.optimizer.zero_grad()
