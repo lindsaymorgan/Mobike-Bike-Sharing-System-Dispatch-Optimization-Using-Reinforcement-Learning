@@ -94,7 +94,7 @@ class Net(nn.Module):
     def __init__(self, NUM_STATES):
         super(Net, self).__init__()
 
-        EMB_SIZE = 128
+        EMB_SIZE = 30
         OTHER_SIZE = NUM_STATES  # fixme: update this value based on the input
 
         self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * 2, 256).cuda()
@@ -326,6 +326,8 @@ def main():
                 net.learn()
                 if done:
                     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
+                    print(f"{round(reward_sum, 3)}", file=open("output_result.txt", "a"))
+
             if done:
                 step_counter_list.append(step_counter)
                 net.plot(net.ax, step_counter_list)
