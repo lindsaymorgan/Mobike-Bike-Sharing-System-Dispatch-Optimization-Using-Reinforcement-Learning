@@ -293,6 +293,7 @@ def evaluate(env, net, render=False):
             state, reward, done = env.step(action)
             episode_reward += reward
             print(f"obs:{state[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{state[-1]}")
+            print(f"region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} move:{action % (2 * self.move_amount_limit + 1) - self.move_amount_limit}", file=open("output_action.txt", "a"))
             # if render:
             #     env.render()
             if done:
@@ -326,7 +327,7 @@ def main():
                 net.learn()
                 if done:
                     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
-                    print(f"{round(reward_sum, 3)}", file=open("output_result.txt", "a"))
+                    print(f"{round(reward_sum, 3)}", file=open("output_result-1.txt", "a"))
 
             if done:
                 step_counter_list.append(step_counter)
