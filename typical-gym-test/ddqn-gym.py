@@ -26,9 +26,9 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.fc1 = nn.Linear(NUM_STATES, 30)
+        self.fc1 = nn.Linear(NUM_STATES, 128)
         self.fc1.weight.data.normal_(0, 0.1)
-        self.fc2 = nn.Linear(30, NUM_ACTIONS)
+        self.fc2 = nn.Linear(128, NUM_ACTIONS)
         self.fc2.weight.data.normal_(0, 0.1)
 
 
@@ -94,7 +94,8 @@ class Dqn():
 
         q_eval = self.eval_net(batch_state).gather(1, batch_action)
         q_next = self.target_net(batch_next_state).detach()
-        q_target = batch_reward + GAMMA*q_next.max(1)[0].view(BATCH_SIZE, 1)
+        q_eval_next = self.eval_net(batch_state).detach()
+        q_target = batch_reward + GAMMA*torch.FloatTensor([q_eval_next[i][r] for i,r in enumerate(q_next.max(1)[1].numpy())]).view(BATCH_SIZE, 1)
 
         loss = self.loss(q_eval, q_target)
         self.optimizer.zero_grad()
@@ -112,9 +113,10 @@ def main():
         step_counter = 0
         while True:
             step_counter +=1
-            env.render()
+            # env.render()
             action = net.choose_action(state)
             next_state, reward, done, info = env.step(action)
+            # print(reward)
             reward = reward * 100 if reward >0 else reward * 5
             net.store_trans(state, action, reward, next_state)
 
@@ -124,7 +126,10 @@ def main():
                     print("episode {}, the reward is {}".format(episode, round(reward, 3)))
             if done:
                 step_counter_list.append(step_counter)
-                net.plot(net.ax, step_counter_list)
+                print(step_counter)
+                with open('ddqn-gym-step-counter.txt','a+') as f:
+                    f.write(f'{step_counter}\n')
+                # net.plot(net.ax, step_counter_list)
                 break
 
             state = next_state

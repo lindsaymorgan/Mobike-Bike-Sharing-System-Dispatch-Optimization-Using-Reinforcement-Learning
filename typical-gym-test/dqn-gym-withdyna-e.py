@@ -26,9 +26,9 @@ class Net(nn.Module):
     def __init__(self):
         super(Net, self).__init__()
 
-        self.fc1 = nn.Linear(NUM_STATES, 30)
+        self.fc1 = nn.Linear(NUM_STATES, 128)
         self.fc1.weight.data.normal_(0, 0.1)
-        self.fc2 = nn.Linear(30, NUM_ACTIONS)
+        self.fc2 = nn.Linear(128, NUM_ACTIONS)
         self.fc2.weight.data.normal_(0, 0.1)
 
 
@@ -112,7 +112,7 @@ def main():
         step_counter = 0
         while True:
             step_counter +=1
-            env.render()
+            # env.render()
             action = net.choose_action(state)
             next_state, reward, done, info = env.step(action)
             reward = reward * 100 if reward >0 else reward * 5
@@ -124,7 +124,10 @@ def main():
                     print("episode {}, the reward is {}".format(episode, round(reward, 3)))
             if done:
                 step_counter_list.append(step_counter)
-                net.plot(net.ax, step_counter_list)
+                print(step_counter)
+                with open('dqn-gym-step-counter.txt', 'a+') as f:
+                    f.write(f'{step_counter}\n')
+                # net.plot(net.ax, step_counter_list)
                 break
 
             state = next_state

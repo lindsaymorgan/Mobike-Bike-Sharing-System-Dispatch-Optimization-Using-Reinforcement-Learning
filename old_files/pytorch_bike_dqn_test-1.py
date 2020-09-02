@@ -307,7 +307,7 @@ def main():
     env = Env(region_num=4, move_amount_limit=500, eps_num=24)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = env.region_num + 3  # MountainCar-v0: (2,)
-    net = Dqn(NUM_STATES, NUM_ACTIONS, move_amount_limit=500)
+    net = Dqn(NUM_STATES, NUM_ACTIONS, env.move_amount_limit)
     print("The DQN is collecting experience...")
     step_counter_list = []
     for episode in range(EPISODES):
@@ -327,7 +327,7 @@ def main():
                 net.learn()
                 if done:
                     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
-                    print(f"{round(reward_sum, 3)}", file=open("old_files/output_result-ver1.txt", "a"))
+                    print(f"{round(reward_sum, 3)}", file=open("output_result-ver1.txt", "a"))
 
             if done:
                 step_counter_list.append(step_counter)

@@ -1,5 +1,4 @@
 import gym
-from gridworld import CliffWalkingWapper, FrozenLakeWapper
 from agent import QLearningAgent
 import time
 
@@ -60,11 +59,6 @@ def main():
         print('Episode %s: steps = %s , reward = %.1f' % (episode, ep_steps,
                                                           ep_reward))
 
-        # 每隔20个episode渲染一下看看效果
-        if episode % 20 == 0:
-            is_render = True
-        else:
-            is_render = False
     # 训练结束，查看算法效果
     test_episode(env, agent)
 

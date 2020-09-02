@@ -11,12 +11,12 @@ import random
 EPSILON = 0.9
 GAMMA = 0.9
 LR = 0.01
-MEMORY_CAPACITY = 20
-Q_NETWORK_ITERATION = 10
+MEMORY_CAPACITY = 2000
+Q_NETWORK_ITERATION = 1000
 BATCH_SIZE = 32
 
-EPISODES = 4
-need = pd.read_csv('4region_trip_20170510_eachhour.csv')
+EPISODES = 2000
+need = pd.read_csv('../fake-very-small-test/fake_4region_trip_20170510.csv')
 
 
 class Env(object):
@@ -34,7 +34,7 @@ class Env(object):
         self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(eps_num)])
 
         self.t = 0
-        self.obs_init = np.array([500, 500, 500, 500, 0, 0])  # 各方格单车量+货车位置+货车上的单车量
+        self.obs_init = np.array([15, 15, 15, 15, 0, 0])  # 各方格单车量+货车位置+货车上的单车量
         self.obs_init[:self.region_num] -= self.out_nums[0, :self.region_num]
 
 
@@ -54,7 +54,6 @@ class Env(object):
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
         move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
-        out_num = np.array(self.start_region[self.t_index[self.t]].agg(np.sum))
 
         if self.obs[-1] < 0:
             print(self.obs[region], self.obs[-1], move)
@@ -174,28 +173,30 @@ class Dqn():
             if move + state[region] >= 0 and move <= state[-1]:
                 feasible_action.append(action)
 
-        tmp_value = list()
+        tmp_x = list()
+        tmp_y = list()
         # 对每个feasible action算value
+        a_t = state[: - 3]
+        v_pos = state[- 3]
+        bike_num_t = state[-2:]
         for action in feasible_action:
-            a_t = state[: - 3]
-            v_pos = state[- 3]
-            bike_num_t = state[-2:]
-
             move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
             region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
 
-            x = torch.FloatTensor([np.append(np.append(a_t, bike_num_t), move)]).cuda()
-            station = torch.LongTensor([np.array([v_pos, region])]).cuda()
+            tmp_x.append(np.concatenate([a_t, bike_num_t, np.array([move])]))
+            tmp_y.append(np.array([v_pos, region]))
 
-            action_value = self.eval_net(x, station)
-            tmp_value.append(action_value)
+        x = torch.FloatTensor(tmp_x).cuda()
+        station = torch.LongTensor(tmp_y).cuda()
 
-        m = np.amax(tmp_value)
-        indices = np.nonzero(tmp_value == m)[0]
-        action = feasible_action[np.random.choice(indices)]
+        action_val = self.target_net.forward(x, station)
 
-        # max_indice = [i for i, j in enumerate(tmp_value) if j == max(tmp_value)]  # 找最大index
-        # action = feasible_action[random.choice(max_indice)]  # 如果有多个index随机选一个，获得对应action
+        # m = np.amax(action_val)
+        # indices = np.nonzero(action_val == m)[0]
+        # action = feasible_action[np.random.choice(indices)]
+
+        max_indice = [i for i, j in enumerate([i[0] for i in action_val]) if j == np.max([i[0] for i in action_val])] # 找最大index
+        action = feasible_action[random.choice(max_indice)]  # 如果有多个index随机选一个，获得对应action
 
         # state = torch.unsqueeze(torch.FloatTensor(state) ,0)
         #
@@ -304,10 +305,10 @@ class Dqn():
 
 
 def main():
-    env = Env(region_num=4, move_amount_limit=500, eps_num=24)
+    env = Env(region_num=4, move_amount_limit=15, eps_num=5)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = env.region_num + 3  # MountainCar-v0: (2,)
-    net = Dqn(NUM_STATES, NUM_ACTIONS, move_amount_limit=500)
+    net = Dqn(NUM_STATES, NUM_ACTIONS, env.move_amount_limit)
     print("The DQN is collecting experience...")
     step_counter_list = []
     for episode in range(EPISODES):
@@ -318,6 +319,7 @@ def main():
             step_counter += 1
             # env.render()
             action = net.choose_action(state)
+            print("the action is {}".format(action))
             next_state, reward, done = env.step(action)
             # reward = reward * 100 if reward >0 else reward * 5
             net.store_trans(state, action, reward, next_state)
@@ -327,7 +329,7 @@ def main():
                 net.learn()
                 if done:
                     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
-                    print(f"{round(reward_sum, 3)}", file=open("old_files/output_result-ver1.txt", "a"))
+                    print(f"{round(reward_sum, 3)}", file=open("output_result-ver1.txt", "a"))
 
             if done:
                 step_counter_list.append(step_counter)
