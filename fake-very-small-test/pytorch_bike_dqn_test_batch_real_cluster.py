@@ -8,6 +8,8 @@ import pandas as pd
 import random
 import time
 import copy
+import multiprocessing
+from multiprocessing.pool import ThreadPool
 
 # hyper parameters
 # EPSILON = 0.85
@@ -21,6 +23,9 @@ EPISODES = 20000
 need = pd.read_csv('real_4region_trip_20170510_5stage.csv')
 ts=int(time.time())
 
+cores = multiprocessing.cpu_count()-1
+global pool
+pool = ThreadPool(processes=cores)
 
 class Env(object):
     def __init__(self, region_num, move_amount_limit, eps_num):
@@ -54,15 +59,11 @@ class Env(object):
 
 
 
-    def check_limit(self,state,action,t):  #对一个state(不含t,14位),action,t(当前)是否合法
-
-        tmp_obs = copy.deepcopy(state)
-        tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
-        tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(t),]
+    def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法
+        tmp_obs, action, t =arg
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
         move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
-
 
         if move + tmp_obs[-self.region_num - 2 + region] >= 0 and move <= tmp_obs[-1] \
                 and (tmp_obs[-self.region_num - 2 + region] - self.out_nums[int(t+1), region]) * move <= 0:
@@ -70,13 +71,21 @@ class Env(object):
         else:
             return True   #非法动作
 
-    def get_feasible_action(self,state):  #对一个state，给出合法的action组
+    def get_feasible_action(self,state_with_t):  #对一个state，给出合法的action组
 
         feasible_action = list()
         feasible_move=list()
         feasible_region=list()
-        for action in range(self.action_dim):
-            if not self.check_limit(state[:-1], action, state[-1]):
+
+        tmp_obs = copy.deepcopy(state_with_t[:-1])
+        tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
+        tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(state_with_t[-1]),]
+
+
+        result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]) for action in range(self.action_dim)])
+
+        for action,r in enumerate(result):
+            if not r:
                 feasible_action.append(action)
                 move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
                 region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
@@ -89,7 +98,10 @@ class Env(object):
 
         # 更新时间状态
         self.t += 1
-        if self.check_limit(self.obs,action,self.t-1):   #若不合理则不采取任何操作 结束周期 回报设为大负数
+        tmp_obs = copy.deepcopy(self.obs)
+        tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
+        tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(self.t-1),]
+        if self.check_limit((tmp_obs,action,self.t-1)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
             done=True
             reward=-100000
             return np.append(self.obs, self.t), reward, done
@@ -217,8 +229,10 @@ class Dqn():
 
         action_val = self.target_net.forward(x, station)
 
-        max_indice = [i for i, j in enumerate([i[0] for i in action_val]) if
-                      j == np.max([i[0] for i in action_val])]  # 找最大index
+        arr_action_val=action_val.detach().cpu().numpy().reshape(len(action_val))
+
+        max_indice = [i for i, j in enumerate(arr_action_val) if
+                      j == np.max(arr_action_val)]  # 找最大index
         action = feasible_action[random.choice(max_indice)]  # 如果有多个index随机选一个，获得对应action
 
         return action
@@ -359,6 +373,9 @@ def main():
                 break
 
             state = next_state
+        if episode % 10 == 0:
+            te = time.time()
+            print(f'time consume: {te - ts}')
     print(net.evaluate(env))
 
 

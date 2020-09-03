@@ -1,11 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always" serverName="root@47.115.19.117:22">
+  <component name="PublishConfigData" autoUpload="Always">
     <serverData>
       <paths name="aliyun">
         <serverdata>
           <mappings>
             <mapping deploy="/root/usr/lindsay-project/dqn-test" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="lindsay@10.133.35.118:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/lindsay/bike-small-test" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

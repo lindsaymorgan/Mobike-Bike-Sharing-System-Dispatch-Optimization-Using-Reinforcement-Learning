@@ -9,6 +9,7 @@ import random
 import time
 import copy
 import multiprocessing
+from multiprocessing.pool import ThreadPool
 
 # hyper parameters
 # EPSILON = 0.85
@@ -22,7 +23,9 @@ EPISODES = 20000
 need = pd.read_csv('fake_4region_trip_20170510.csv')
 ts=int(time.time())
 
-cores = multiprocessing.cpu_count()-2
+cores = multiprocessing.cpu_count()-1
+global pool
+pool = ThreadPool(processes=cores)
 
 
 class Env(object):
@@ -50,7 +53,7 @@ class Env(object):
         return np.append(self.obs, self.t)
 
     def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法
-        tmp_obs, action, t=arg
+        tmp_obs, action, t =arg
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
         move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
@@ -71,7 +74,7 @@ class Env(object):
         tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
         tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(state_with_t[-1]),]
 
-        pool = multiprocessing.Pool(processes=cores)
+
         result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]) for action in range(self.action_dim)])
 
         for action,r in enumerate(result):
@@ -219,8 +222,10 @@ class Dqn():
 
         action_val = self.target_net.forward(x, station)
 
-        max_indice = [i for i, j in enumerate([i[0] for i in action_val]) if
-                      j == np.max([i[0] for i in action_val])]  # 找最大index
+        arr_action_val = action_val.detach().cpu().numpy().reshape(len(action_val))
+
+        max_indice = [i for i, j in enumerate(arr_action_val) if
+                      j == np.max(arr_action_val)]  # 找最大index
         action = feasible_action[random.choice(max_indice)]  # 如果有多个index随机选一个，获得对应action
 
         return action
