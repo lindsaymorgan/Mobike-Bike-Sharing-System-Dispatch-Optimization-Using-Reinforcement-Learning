@@ -59,7 +59,7 @@ class Env(object):
         move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
 
         if move + tmp_obs[-self.region_num - 2 + region] >= 0 and move <= tmp_obs[-1] \
-                and (tmp_obs[-self.region_num - 2 + region] - self.out_nums[int(t+1), region]) * move <= 0:
+                and (tmp_obs[-self.region_num - 2 + region] - self.out_nums[int(t), region]) * move <= 0:
             return False #合法动作
         else:
             return True   #非法动作
@@ -75,7 +75,7 @@ class Env(object):
         tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(state_with_t[-1]),]
 
 
-        result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]) for action in range(self.action_dim)])
+        result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]+1) for action in range(self.action_dim)])
 
         for action,r in enumerate(result):
             if not r:
@@ -94,7 +94,7 @@ class Env(object):
         tmp_obs = copy.deepcopy(self.obs)
         tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
         tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(self.t-1),]
-        if self.check_limit((tmp_obs,action,self.t-1)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
+        if self.check_limit((tmp_obs,action,self.t)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
             done=True
             reward=-100000
             return np.append(self.obs, self.t), reward, done

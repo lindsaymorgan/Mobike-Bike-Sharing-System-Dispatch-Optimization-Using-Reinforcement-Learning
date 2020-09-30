@@ -19,7 +19,7 @@ MEMORY_CAPACITY = 2000
 Q_NETWORK_ITERATION = 100
 BATCH_SIZE = 32
 
-EPISODES = 20000
+EPISODES = 8000
 need = pd.read_csv('real_4region_trip_20170510_5stage.csv')
 ts=int(time.time())
 
