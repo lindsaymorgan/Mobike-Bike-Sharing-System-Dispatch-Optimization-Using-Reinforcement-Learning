@@ -123,7 +123,7 @@ max_value=max(history_dict[3].values())
 max_state_3=[i for i,v in history_dict[3].items() if v==max_value][0]
 
 ts=int(time.time())
-outfile=f"result_action/fakesmall_output_action_{ts}.txt"
+outfile=f"result_action/fakesmall_output_action_fixmove_reliab{ts}.txt"
 reward_sum=0
 print(max_state_3,history_action[3][max_state_3],
                     file=open(outfile, "a"))
@@ -144,5 +144,5 @@ print(max_state_0,history_action[0][max_state_0],
                     file=open(outfile, "a"))
 reward_sum+=history_action[0][max_state_0][-1]
 
-print(f"best reward : {round(reward_sum/(eps_num-1), 3)}",
+print(f"best reward : {round(reward_sum/(eps_num), 3)}",
                     file=open(outfile, "a"))

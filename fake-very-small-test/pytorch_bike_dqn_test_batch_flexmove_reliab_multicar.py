@@ -405,7 +405,7 @@ class Dqn():
 
 def main():
     eps_num = 5
-    car_num=2
+    car_num=1
     EPSILON = 0.9
     EPS_DECAY = 0.99
     env = Env(region_num=4, move_amount_limit=10, eps_num=eps_num,car_num=car_num)

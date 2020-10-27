@@ -63,8 +63,8 @@ class Env(object):
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
         move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
 
-        if move + tmp_obs[-self.obs_dim + region] >= 0 and move <= tmp_obs[-self.car_num+int(current_car)] \
-                and (tmp_obs[-self.obs_dim + region] - self.out_nums[int(current_eps+1), region]) * move <= 0:
+        #\ and (tmp_obs[-self.obs_dim + region] - self.out_nums[int(current_eps+1), region]) * move <= 0
+        if move + tmp_obs[-self.obs_dim + region] >= 0 and move <= tmp_obs[-self.car_num+int(current_car)] :
             return False #合法动作
         else:
             return True   #非法动作
@@ -101,7 +101,7 @@ class Env(object):
     def calc_tmp_R(self):
 
         tmp_obs=self.obs.copy()
-        tmp_obs[-self.obs_dim:-2 * self.car_num] -= self.out_nums[self.current_eps + 1,]
+        tmp_obs[-self.obs_dim:-2 * self.car_num] -= self.out_nums[self.current_eps + 1,] #Todo:check logic
         raw_R=np.sum(tmp_obs[-self.obs_dim:-2 * self.car_num][tmp_obs[-self.obs_dim:-2 * self.car_num] < 0])
 
         return raw_R
@@ -401,7 +401,7 @@ def main():
         step_counter = 0
         reward_sum = 0
         history_action=[]
-        EPSILON = max(EPSILON * EPS_DECAY, 0.05)
+        EPSILON = max(EPSILON * EPS_DECAY, 0.01)
         fore_R=0
         while True:
             step_counter += 1

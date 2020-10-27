@@ -357,7 +357,7 @@ def main():
     NUM_STATES = 2*env.region_num + 7 # MountainCar-v0: (2,)
 
 
-    net = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num)
+    agent = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num)
     print("The DQN is collecting experience...")
     step_counter_list = []
     for episode in range(EPISODES):
@@ -368,11 +368,11 @@ def main():
         step_counter = 0
         reward_sum = 0
         history_action=[]
-        EPSILON = max(EPSILON * EPS_DECAY, 0.05)
+        EPSILON = max(EPSILON * EPS_DECAY, 0.01)
         while True:
             step_counter += 1
             # env.render()
-            action = net.choose_action(state,EPSILON,env)
+            action = agent.choose_action(state,EPSILON,env)
 
             move = action % (2 * env.move_amount_limit + 1) - env.move_amount_limit
             region=int(np.floor(action / (2 * env.move_amount_limit + 1)))
@@ -381,11 +381,11 @@ def main():
             # print("the action is {}".format(action))
             next_state, reward, done = env.step(action)
             # print(next_state,reward)
-            net.store_trans(state, action, reward, next_state)
+            agent.store_trans(state, action, reward, next_state)
             reward_sum += reward
 
-            if net.memory_counter >= MEMORY_CAPACITY:
-                net.learn(env)
+            if agent.memory_counter >= MEMORY_CAPACITY:
+                agent.learn(env)
                 # if done:
                 #     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
                     # print(f"{round(reward_sum, 3)}", file=open(f"result_history/actionless_output_result_{ts}.txt", "a"))
@@ -400,7 +400,7 @@ def main():
         if episode % 100 == 0:
             te = time.time()
             print(f'time consume: {te - ts}')
-    print(net.evaluate(env))
+    print(agent.evaluate(env))
 
 
 if __name__ == '__main__':

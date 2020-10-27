@@ -34,7 +34,7 @@ class Env(object):
         self.region_num = region_num
         self.move_amount_limit = move_amount_limit
         self.action_dim = region_num * (2 * move_amount_limit + 1)
-        self.obs_dim = 2 * region_num + 1
+        # self.obs_dim = 2 * region_num + 1
         self.episode_num = eps_num
 
         self.start_region = need.groupby('start_region')
@@ -328,7 +328,7 @@ class Dqn():
 
 def main():
     eps_num = 5
-    EPSILON = 0.9
+    EPSILON = 0.99
     EPS_DECAY = 0.99
     env = Env(region_num=4, move_amount_limit=10, eps_num=eps_num)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
@@ -343,7 +343,7 @@ def main():
         step_counter = 0
         reward_sum = 0
         history_action=[]
-        EPSILON = max(EPSILON * EPS_DECAY, 0.05)
+        EPSILON = max(EPSILON * EPS_DECAY, 0.01)
         while True:
             step_counter += 1
             # env.render()
@@ -367,7 +367,7 @@ def main():
 
             if done:
                 print("episode {}, the reward is {}, history action {}".format(episode, round(reward_sum/(eps_num-1), 3),history_action))
-                print(f"{round(reward_sum, 3)}", file=open(f"result_history/smalltest_output_result_{ts}.txt", "a"))
+                print(f"{round(reward_sum/(eps_num-1), 3)}", file=open(f"result_history/fix_smalltest_output_result_{ts}.txt", "a"))
                 break
 
             state = next_state
