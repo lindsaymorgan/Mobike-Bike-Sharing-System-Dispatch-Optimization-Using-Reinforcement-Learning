@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import copy
 import time
+import scipy.stats as stats
 
-need = pd.read_csv('fake_4region_trip_20170510.csv')
-dist=pd.read_csv('fake_4region_distance.csv')
+need = pd.read_csv('../fake_4region_trip_20170510.csv')
+dist=pd.read_csv('../fake_4region_distance.csv')
 dist=dist.values
 eps_num=4
 
@@ -74,9 +75,10 @@ class Env(object):
             old_region = self.obs[-2].copy()
             self.obs[-2] = region  # 更新货车位置
 
-
+        # reward = np.mean(
+        #     [stats.poisson.cdf(i, j) for i, j in zip(self.obs[-self.region_num - 2:-2], self.out_nums[self.t,])])
         self.obs[-self.region_num - 2:-2] -= self.out_nums[self.t,]
-        reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0])- dist[old_region][region]*2
+        reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0])  #- dist[old_region][region]*2
         self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0] = 0
 
         return tuple(self.obs), reward
@@ -121,7 +123,7 @@ max_value=max(history_dict[3].values())
 max_state_3=[i for i,v in history_dict[3].items() if v==max_value][0]
 
 ts=int(time.time())
-outfile=f"result_action/fakesmall_output_action_{ts}.txt"
+outfile=f"result_action/fakesmall_output_action_fixmove_{ts}.txt"
 reward_sum=0
 print(max_state_3,history_action[3][max_state_3],
                     file=open(outfile, "a"))
@@ -142,5 +144,5 @@ print(max_state_0,history_action[0][max_state_0],
                     file=open(outfile, "a"))
 reward_sum+=history_action[0][max_state_0][-1]
 
-print(f"best reward : {reward_sum}",
+print(f"best reward : {round(reward_sum/(eps_num), 3)}",
                     file=open(outfile, "a"))

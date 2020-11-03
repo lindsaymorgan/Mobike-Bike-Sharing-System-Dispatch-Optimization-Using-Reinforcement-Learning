@@ -15,7 +15,7 @@ import pandas as pd
 # ACTION_DIM = 2
 STEP = 20000
 SAMPLE_NUMS = 30
-need = pd.read_csv('fake_4region_trip_20170510.csv')
+need = pd.read_csv('../fake_4region_trip_20170510.csv')
 
 class Env(object):
     def __init__(self, region_num, move_amount_limit, eps_num):

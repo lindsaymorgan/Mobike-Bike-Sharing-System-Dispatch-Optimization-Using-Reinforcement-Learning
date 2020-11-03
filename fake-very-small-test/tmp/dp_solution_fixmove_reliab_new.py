@@ -9,9 +9,9 @@ import copy
 import time
 import scipy.stats as stats
 
-need = pd.read_csv('fake_4region_trip_20170510.csv')
-dist=pd.read_csv('fake_4region_distance.csv')
-dist=dist.values
+need = pd.read_csv('../fake_4region_trip_20170510.csv')
+# dist=pd.read_csv('fake_4region_distance.csv')
+# dist=dist.values
 eps_num=4
 
 
@@ -47,8 +47,10 @@ class Env(object):
 
         tmp_obs[:-2] += self.in_nums[int(t),]
 
-        if move + tmp_obs[region] >= 0 and move <= tmp_obs[-1] \
-                and (tmp_obs[region] - self.out_nums[int(t+1), region]) * move <= 0:
+        #\and (tmp_obs[region] - self.out_nums[int(t+1), region]) * move <= 0:
+
+
+        if move + tmp_obs[region] >= 0 and move <= tmp_obs[-1] :
             return False #合法动作
         else:
             return True   #非法动作
@@ -64,7 +66,7 @@ class Env(object):
 
         # 更新单车分布状态
         # 处理上时段骑入
-        self.obs[-self.region_num - 2:-2] += self.in_nums[self.t - 1,]
+
 
 
         # 筛选不合理情况 若合理 按照推算移动车辆 更新货车状态 若不合理则不采取任何操作
@@ -75,10 +77,12 @@ class Env(object):
             old_region = self.obs[-2].copy()
             self.obs[-2] = region  # 更新货车位置
 
+        self.obs[-self.region_num - 2:-2] += self.in_nums[self.t - 1,]
+
         reward = np.mean(
             [stats.poisson.cdf(i, j) for i, j in zip(self.obs[-self.region_num - 2:-2], self.out_nums[self.t,])])
         self.obs[-self.region_num - 2:-2] -= self.out_nums[self.t,]
-        # reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0])- dist[old_region][region]*2
+        # reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0])  #- dist[old_region][region]*2
         self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0] = 0
 
         return tuple(self.obs), reward
@@ -123,7 +127,7 @@ max_value=max(history_dict[3].values())
 max_state_3=[i for i,v in history_dict[3].items() if v==max_value][0]
 
 ts=int(time.time())
-outfile=f"result_action/fakesmall_output_action_fixmove_reliab{ts}.txt"
+outfile=f"result_action/fakesmall_output_action_fixmove_new_reliab{ts}.txt"
 reward_sum=0
 print(max_state_3,history_action[3][max_state_3],
                     file=open(outfile, "a"))

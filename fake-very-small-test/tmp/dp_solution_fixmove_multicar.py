@@ -9,7 +9,7 @@ import copy
 import time
 import scipy.stats as stats
 
-need = pd.read_csv('fake_4region_trip_20170510.csv')
+need = pd.read_csv('../fake_4region_trip_20170510.csv')
 # dist=pd.read_csv('fake_4region_distance.csv')
 # dist=dist.values
 eps_num=5

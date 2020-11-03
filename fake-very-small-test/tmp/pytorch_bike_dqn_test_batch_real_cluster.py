@@ -10,7 +10,6 @@ import time
 import copy
 import multiprocessing
 from multiprocessing.pool import ThreadPool
-import scipy.stats as stats
 
 # hyper parameters
 # EPSILON = 0.85
@@ -20,16 +19,13 @@ MEMORY_CAPACITY = 2000
 Q_NETWORK_ITERATION = 100
 BATCH_SIZE = 32
 
-EPISODES = 10000
-need = pd.read_csv('fake_4region_trip_20170510.csv')
-dist=pd.read_csv('fake_4region_distance.csv')
-dist=dist.values
+EPISODES = 8000
+need = pd.read_csv('../real_4region_trip_20170510_5stage.csv')
 ts=int(time.time())
 
 cores = multiprocessing.cpu_count()-1
 global pool
 pool = ThreadPool(processes=cores)
-
 
 class Env(object):
     def __init__(self, region_num, move_amount_limit, eps_num):
@@ -42,11 +38,12 @@ class Env(object):
         self.start_region = need.groupby('start_region')
         self.end_region = need.groupby('end_region')
         self.t_index = {i: str(i) for i in range(eps_num)}
-        self.out_nums = np.array([np.random.poisson(n) for n in [m for m in [self.start_region[str(i)].agg(np.sum) for i in range(eps_num)]]])  #生成泊松分布的flow
+        self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(eps_num)])
         self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(eps_num)])
 
         self.t = 0
-        self.obs_init = np.array([15, 15, 15, 15, 0, 0,0,0,15, 15, 15, 15, 0, 0])  # 各方格单车量+货车位置+货车上的单车量
+        self.determine_init_state()
+        self.obs_init = np.array(copy.deepcopy(self.init_state)+ [0, 0,0,0]+copy.deepcopy(self.init_state)+[0, 0])  # 各方格单车量+货车位置+货车上的单车量
         self.obs_init[-self.region_num-2:-2] -= self.out_nums[0, ]
 
 
@@ -55,20 +52,21 @@ class Env(object):
         self.t = 0
         return np.append(self.obs, self.t)
 
-    def eval_flow_init(self):
-        self.out_nums = np.array([np.random.poisson(n) for n in [m for m in [self.start_region[str(i)].agg(np.sum) for i in range(self.episode_num)]]])
-        self.obs_init = np.array([15, 15, 15, 15, 0, 0, 0, 0, 15, 15, 15, 15, 0, 0])  # 各方格单车量+货车位置+货车上的单车量
-        self.obs_init[-self.region_num - 2:-2] -= self.out_nums[0,]
+    def determine_init_state(self):
+        region_outheat=[ sum(x) for x in zip(*self.out_nums) ]
+        rate=8500/sum(region_outheat)
+        self.init_state=[np.ceil(i*rate) for i in region_outheat]
+
 
 
     def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法
         tmp_obs, action, t =arg
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
-        move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+        move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
 
         if move + tmp_obs[-self.region_num - 2 + region] >= 0 and move <= tmp_obs[-1] \
-                and (tmp_obs[-self.region_num - 2 + region] - self.out_nums[int(t), region]) * move <= 0:
+                and (tmp_obs[-self.region_num - 2 + region] - self.out_nums[int(t+1), region]) * move <= 0:
             return False #合法动作
         else:
             return True   #非法动作
@@ -84,12 +82,12 @@ class Env(object):
         tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(state_with_t[-1]),]
 
 
-        result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]+1) for action in range(self.action_dim)])
+        result=pool.map(self.check_limit, [(tmp_obs, action, state_with_t[-1]) for action in range(self.action_dim)])
 
         for action,r in enumerate(result):
             if not r:
                 feasible_action.append(action)
-                move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+                move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
                 region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
                 feasible_move.append(move)
                 feasible_region.append(region)
@@ -103,7 +101,7 @@ class Env(object):
         tmp_obs = copy.deepcopy(self.obs)
         tmp_obs[:self.region_num + 2] = tmp_obs[-self.region_num - 2:]  # 更新状态
         tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(self.t-1),]
-        if self.check_limit((tmp_obs,action,self.t)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
+        if self.check_limit((tmp_obs,action,self.t-1)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
             done=True
             reward=-100000
             return np.append(self.obs, self.t), reward, done
@@ -116,7 +114,7 @@ class Env(object):
         self.obs[:self.region_num+2]=self.obs[-self.region_num-2:]  #更新状态
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
-        move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+        move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
 
         # 更新单车分布状态
         # 处理上时段骑入
@@ -127,7 +125,6 @@ class Env(object):
         self.obs[-self.region_num-2+region] += move
         # 更新货车状态
         self.obs[-1] -= move  # 更新货车上的单车数
-        old_region=self.obs[-2].copy()
         self.obs[-2] = region  # 更新货车位置
         # 更新之前的动作历史
         self.obs[-self.region_num-2-1] = move  # 搬动的单车数
@@ -135,8 +132,7 @@ class Env(object):
 
 
         self.obs[-self.region_num-2:-2] -= self.out_nums[self.t, ]
-        reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0]) - dist[old_region][region]*2
-        #搬动后的损失顾客数
+        reward = np.sum(self.obs[-self.region_num - 2:-2][self.obs[-self.region_num - 2:-2] < 0])
         self.obs[-self.region_num-2:-2][self.obs [-self.region_num-2:-2]< 0] = 0
 
         return np.append(self.obs, self.t), reward, done
@@ -146,7 +142,7 @@ class Net(nn.Module):
     def __init__(self, NUM_STATES):
         super(Net, self).__init__()
 
-        EMB_SIZE = 10
+        EMB_SIZE = 100
         OTHER_SIZE = NUM_STATES-2  # fixme: update this value based on the input
 
         self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * 4, 256).cuda()
@@ -233,7 +229,7 @@ class Dqn():
 
         action_val = self.target_net.forward(x, station)
 
-        arr_action_val = action_val.detach().cpu().numpy().reshape(len(action_val))
+        arr_action_val=action_val.detach().cpu().numpy().reshape(len(action_val))
 
         max_indice = [i for i, j in enumerate(arr_action_val) if
                       j == np.max(arr_action_val)]  # 找最大index
@@ -262,7 +258,7 @@ class Dqn():
 
         x=torch.FloatTensor(np.delete(batch_memory[:, :self.NUM_STATES],
                   [self.region_num,self.region_num+2,self.region_num*2+4], 1)).cuda()
-        move = torch.FloatTensor([[i[0] % (2 * self.move_amount_limit + 1) - self.move_amount_limit] for i in
+        move = torch.FloatTensor([[(i[0] % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10] for i in
                                   batch_memory[:, self.NUM_STATES:self.NUM_STATES + 1]]).cuda()
         x = torch.cat((x, move), 1)
 
@@ -315,22 +311,16 @@ class Dqn():
     def evaluate(self, env, render=False):
         eval_reward = []
         for i in range(1):
-
-            #指定固定的out_num
-            env.out_nums= np.array([self.start_region[str(i)].agg(np.sum) for i in range(env.episode_num)])
-            env.obs_init = np.array([15, 15, 15, 15, 0, 0, 0, 0, 15, 15, 15, 15, 0, 0])  # 各方格单车量+货车位置+货车上的单车量
-            env.obs_init[-env.region_num - 2:-2] -= env.out_nums[0,]
-
             obs = env.init()
             episode_reward = 0
             while True:
-                action = self.predict(obs,env)  # 预测动作，只选最优动作
+                action = self.predict(obs)  # 预测动作，只选最优动作
                 obs, reward, done = env.step(action)
                 episode_reward += reward
                 print(f"obs:{obs[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{obs[-1]}")
                 print(
                     f"obs:{obs[:-1]} t:{obs[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
-                    f"move:{action % (2 * self.move_amount_limit + 1) - self.move_amount_limit} reward:{reward} "
+                    f"move:{10*(action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)} reward:{reward} "
                     f"reward_sum:{episode_reward}",
                     file=open(f"result_action/actionless_output_action_{ts}.txt", "a"))
                 # if render:
@@ -345,18 +335,14 @@ def main():
     eps_num = 5
     EPSILON = 0.9
     EPS_DECAY = 0.99
-    env = Env(region_num=4, move_amount_limit=10, eps_num=eps_num)
+    env = Env(region_num=58, move_amount_limit=50, eps_num=eps_num)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = 2*env.region_num + 7 # MountainCar-v0: (2,)
-
 
     net = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num)
     print("The DQN is collecting experience...")
     step_counter_list = []
     for episode in range(EPISODES):
-        if episode % 2000 ==0:
-            env.eval_flow_init()
-            print(env.out_nums)
         state = env.init()
         step_counter = 0
         reward_sum = 0
@@ -367,7 +353,7 @@ def main():
             # env.render()
             action = net.choose_action(state,EPSILON,env)
 
-            move = action % (2 * env.move_amount_limit + 1) - env.move_amount_limit
+            move = (action % (2 * env.move_amount_limit + 1) - env.move_amount_limit)*10
             region=int(np.floor(action / (2 * env.move_amount_limit + 1)))
             history_action.append((region,move))
 
@@ -379,18 +365,15 @@ def main():
 
             if net.memory_counter >= MEMORY_CAPACITY:
                 net.learn(env)
-                # if done:
-                #     print("episode {}, the reward is {}".format(episode, round(reward_sum, 3)))
-                    # print(f"{round(reward_sum, 3)}", file=open(f"result_history/actionless_output_result_{ts}.txt", "a"))
+
 
             if done:
                 print("episode {}, the reward is {}, history action {}".format(episode, round(reward_sum, 3),history_action))
-                print(f"{round(reward_sum, 3)}", file=open(f"result_history/smalltest_output_result_{ts}.txt", "a"))
+                print(f"{round(reward_sum, 3)}", file=open(f"result_history/real5stage_output_result_{ts}.txt", "a"))
                 break
 
             state = next_state
-
-        if episode % 100 == 0:
+        if episode % 10 == 0:
             te = time.time()
             print(f'time consume: {te - ts}')
     print(net.evaluate(env))

@@ -10,6 +10,7 @@ import time
 import copy
 import multiprocessing
 from multiprocessing.pool import ThreadPool
+import scipy.stats as stats
 
 # hyper parameters
 # EPSILON = 0.85
@@ -20,7 +21,7 @@ Q_NETWORK_ITERATION = 100
 BATCH_SIZE = 32
 
 EPISODES = 20000
-need = pd.read_csv('fake_4region_trip_20170510.csv')
+need = pd.read_csv('../fake_4region_trip_20170510.csv')
 ts=int(time.time())
 
 cores = multiprocessing.cpu_count()-1
@@ -36,15 +37,21 @@ class Env(object):
         self.car_num = car_num
         self.obs_dim = self.region_num + 2 * self.car_num
         self.episode_num = (eps_num-1)*car_num
-        self.large_eps_num = eps_num
+        self.large_eps_num=eps_num
         self.current_car = 0
         self.current_eps = 0
 
-        self.start_region = need.groupby('start_region')
-        self.end_region = need.groupby('end_region')
-        self.t_index = {i: str(i) for i in range(eps_num)}
-        self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(eps_num)])
-        self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(eps_num)])
+
+    def possion_flow_init(self):
+        self.need = need.copy()
+        for i in range(self.large_eps_num):  # 生成泊松分布的flow
+            self.need[str(i)] = [np.random.poisson(q) for q in self.need[str(i)]]
+
+        self.start_region = self.need.groupby('start_region')
+        self.end_region = self.need.groupby('end_region')
+        self.t_index = {i: str(i) for i in range(self.large_eps_num)}
+        self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
+        self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
 
         self.t = 0
 
@@ -57,19 +64,32 @@ class Env(object):
         self.t = 0
         return np.append(self.obs, self.t)
 
-    def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法 Todo:check
+    def eval_flow_init(self):
+
+        self.need = need.copy()
+        self.start_region = self.need.groupby('start_region')
+        self.end_region = self.need.groupby('end_region')
+        self.t_index = {i: str(i) for i in range(self.large_eps_num)}
+        self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
+        self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
+        self.obs_init = np.hstack(([15, 15, 15, 15], [0] * self.car_num, [0] * self.car_num, [0, 0], [15, 15, 15, 15],
+                      [0] * self.car_num, [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
+        self.obs_init[-self.obs_dim:-(2 * self.car_num)] -= self.out_nums[0,]
+
+
+    def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法
         tmp_obs, action, current_car, current_eps =arg
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
         move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
 
-        #\ and (tmp_obs[-self.obs_dim + region] - self.out_nums[int(current_eps+1), region]) * move <= 0
-        if move + tmp_obs[-self.obs_dim + region] >= 0 and move <= tmp_obs[-self.car_num+int(current_car)] :
+        if move + tmp_obs[-self.obs_dim + region] >= 0 and move <= tmp_obs[-self.car_num+int(current_car)] \
+                and (tmp_obs[-self.obs_dim + region] - self.out_nums[int(current_eps+1), region]) * move <= 0:
             return False #合法动作
         else:
             return True   #非法动作
 
-    def get_feasible_action(self,state_with_t):  #对一个state，给出合法的action组 Todo:check
+    def get_feasible_action(self,state_with_t):  #对一个state，给出合法的action组
 
         feasible_action = list()
         feasible_move=list()
@@ -100,31 +120,32 @@ class Env(object):
 
     def calc_tmp_R(self):
 
-        tmp_obs=self.obs.copy()
-        tmp_obs[-self.obs_dim:-2 * self.car_num] -= self.out_nums[self.current_eps + 1,] #Todo:check logic
-        raw_R=np.sum(tmp_obs[-self.obs_dim:-2 * self.car_num][tmp_obs[-self.obs_dim:-2 * self.car_num] < 0])
+        raw_R=np.mean([stats.poisson.cdf(i,j) for i,j in zip(self.obs[-self.obs_dim:-2*self.car_num],self.out_nums[self.current_eps+1,])])
 
         return raw_R
 
 
+
     def step(self, action,fore_R):
 
-        #当前决策周期+决策车辆
-        self.current_car = self.t % self.car_num
-        self.current_eps = int(np.floor(self.t / self.car_num))
+        #再次检查行为是否合法
+        self.current_car=self.t%self.car_num
+        self.current_eps=int(np.floor(self.t/self.car_num))
+        tmp_obs = copy.deepcopy(self.obs)
+        tmp_obs[:self.obs_dim] = tmp_obs[-self.obs_dim:]  # 更新状态
+        if self.current_car==0:
+            tmp_obs[-self.obs_dim:-2*self.car_num] += self.in_nums[int(self.current_eps),]
+
+
+        if self.check_limit((tmp_obs,action,self.current_car,self.current_eps)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
+            done=True
+            reward=-100000
+            return np.append(self.obs, self.t), reward, done
 
         # 更新时间状态
         self.t += 1
 
-        # tmp_obs = copy.deepcopy(self.obs)
-        # tmp_obs[:self.obs_dim] = tmp_obs[-self.obs_dim:]  # 更新状态
-        # tmp_obs[-self.region_num - 2:-2] += self.in_nums[int(self.t-1),]
-        # if self.check_limit((tmp_obs,action,self.t)):   #若不合理则不采取任何操作 结束周期 回报设为大负数
-        #     done=True
-        #     reward=-100000
-        #     return np.append(self.obs, self.t), reward, done
-
-        if self.t == self.episode_num:
+        if self.t == self.episode_num-1:
             done = True
         else:
             done = False
@@ -145,15 +166,16 @@ class Env(object):
         self.obs[-self.obs_dim+region] += move
         # 更新货车状态
         self.obs[-self.car_num+self.current_car] -= move  # 更新货车上的单车数
+        old_region=self.obs[-2*self.car_num+self.current_car].copy()
         self.obs[-2*self.car_num+self.current_car] = region  # 更新货车位置
         # 更新之前的动作历史
         self.obs[-self.obs_dim-1] = move  # 搬动的单车数
         self.obs[-self.obs_dim-2] = region  # 货车位置
 
         recent_R = self.calc_tmp_R()
-        reward = recent_R - fore_R
+        reward=recent_R-fore_R
 
-        if self.current_car == self.car_num - 1:
+        if self.current_car==self.car_num-1:
             self.obs[-self.obs_dim:-2*self.car_num] -= self.out_nums[self.current_eps+1,]
             self.obs[-self.obs_dim:-2*self.car_num][self.obs [-self.obs_dim:-2*self.car_num]< 0] = 0
 
@@ -170,12 +192,13 @@ class Net(nn.Module):
         EMB_SIZE = 10
         OTHER_SIZE = NUM_STATES+2-2*car_num-2  #15
 
-        self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * (2*car_num+2), 256).cuda()
+        self.fc1 = nn.Linear(OTHER_SIZE + EMB_SIZE * (2*car_num+2), 512).cuda()
         # self.fc1.weight.data.normal_(0, 0.1)
-        self.fc2 = nn.Linear(256, 64).cuda()
+        self.fc2 = nn.Linear(512, 128).cuda()
         # self.fc2.weight.data.normal_(0, 0.1)
-        self.fc3 = nn.Linear(64, 1).cuda()
+        self.fc3 = nn.Linear(128, 32).cuda()
         # self.fc3.weight.data.normal_(0, 0.1)
+        self.fc4 = nn.Linear(32, 1).cuda()
         self.m = nn.Dropout(p=0.2).cuda()
 
         self.emb = nn.Embedding(NUM_STATES, EMB_SIZE).cuda()
@@ -190,6 +213,7 @@ class Net(nn.Module):
         x = F.relu(x)
         # x = self.m(x)
         x = self.fc3(x)
+        x = self.fc4(x)
 
         return x
 
@@ -225,29 +249,24 @@ class Dqn():
         self.memory[index,] = trans
         self.memory_counter += 1
 
-    def choose_action(self, state,EPSILON,env):
+    def choose_action(self, state_with_t ,EPSILON,env):
         # print(EPSILON)
         if random.random() > EPSILON:
-            action=self.predict(state,env)
+            action=self.predict(state_with_t,env)
 
         else:
-            feasible_action,m,r=env.get_feasible_action(state)
+            feasible_action,m,r=env.get_feasible_action(state_with_t)
             action = random.choice(feasible_action)
         return action
 
-    def predict(self, state,env):
+    def predict(self, state,env):  #Todo:fix
         # notation that the function return the action's index nor the real action
         # EPSILON
         # feasible action
-        state_1 = np.delete(state, [i for i in range(self.region_num, self.region_num + self.car_num)] +
-                            [self.region_num + self.car_num * 2] +
-                            [i for i in range(self.region_num * 2 + self.car_num * 2 + 2,
-                                              self.region_num * 2 + self.car_num * 3 + 2)])
+        state_1 = np.hstack((state[:self.region_num],state[self.region_num+self.car_num:self.region_num+2*self.car_num],[state[self.region_num+2*self.car_num+1]],\
+            state[-2*self.car_num-self.region_num-1:-2*self.car_num-1],state[-self.car_num-1:]))
+        state_2 = np.hstack((state[self.region_num:self.region_num+self.car_num],[state[self.region_num+2*self.car_num]],state[-2*self.car_num-1:-self.car_num-1]))
 
-        state_2 = np.hstack((state[self.region_num:self.region_num + self.car_num],
-                             [state[self.region_num + 2 * self.car_num]],
-                             state[
-                             2 * self.region_num + 2 * self.car_num + 2:2 * self.region_num + 3 * self.car_num + 2]))
         tmp_x=list()
         tmp_y=list()
         feasible_action,m,r=env.get_feasible_action(state)
@@ -286,19 +305,18 @@ class Dqn():
         # 切取sars切片
         batch_memory = self.memory[sample_index, :]
 
-        x = torch.FloatTensor(np.delete(batch_memory[:, :self.NUM_STATES],
-                                        [i for i in range(self.region_num,self.region_num + self.car_num)]+
-                                        [self.region_num+self.car_num*2]+
-                                        [i for i in range(self.region_num*2+self.car_num*2+2,self.region_num*2+self.car_num*3+2)], 1)).cuda()
-                                         # -1-self.car_num-1,-1-self.car_num-2,-1-self.car_num*2-self.region_num-2,-1-self.car_num*3-self.region_num-2,-1-self.car_num*3-self.region_num-3], 1)).cuda()
-
+        state_1 = np.hstack((batch_memory[:,:self.region_num],
+                             batch_memory[:,self.region_num + self.car_num:self.region_num + 2 * self.car_num],
+                             batch_memory[:,self.region_num + 2 * self.car_num + 1:self.region_num + 2 * self.car_num + 2],
+                             batch_memory[:,-2 * self.car_num - self.region_num - 1:-2 * self.car_num - 1],
+                             batch_memory[:,-self.car_num - 1:]))
         state_2 = np.hstack((batch_memory[:,self.region_num:self.region_num + self.car_num],
                              batch_memory[:,self.region_num + 2 * self.car_num:self.region_num + 2 * self.car_num+1],
-                             batch_memory[:,2*self.region_num + 2 * self.car_num+2:2*self.region_num + 3 * self.car_num+2]))
+                             batch_memory[:,-2 * self.car_num - 1:-self.car_num - 1]))
 
         batch_reward = torch.FloatTensor(batch_memory[:, self.NUM_STATES + 1: self.NUM_STATES + 2]).cuda()
 
-        # x=torch.FloatTensor(state_1).cuda()
+        x=torch.FloatTensor(state_1).cuda()
         move = torch.FloatTensor([[i[0] % (2 * self.move_amount_limit + 1) - self.move_amount_limit] for i in
                                   batch_memory[:, self.NUM_STATES:self.NUM_STATES + 1]]).cuda()
         x = torch.cat((x, move), 1)
@@ -318,14 +336,14 @@ class Dqn():
                 tmp_x = list()
                 tmp_y = list()
                 # 对每个feasible action算value
-                state_1 = np.delete(state,[i for i in range(self.region_num, self.region_num + self.car_num)] +
-                          [self.region_num + self.car_num * 2] +
-                          [i for i in range(self.region_num * 2 + self.car_num * 2 + 2,
-                                            self.region_num * 2 + self.car_num * 3 + 2)])
-
+                state_1 = np.hstack((state[:self.region_num],
+                                     state[self.region_num + self.car_num:self.region_num + 2 * self.car_num],
+                                     [state[self.region_num + 2 * self.car_num + 1]], \
+                                     state[-2 * self.car_num - self.region_num - 1:-2 * self.car_num - 1],
+                                     state[-self.car_num - 1:]))
                 state_2 = np.hstack((state[self.region_num:self.region_num + self.car_num],
                                      [state[self.region_num + 2 * self.car_num]],
-                                     state[2 * self.region_num + 2 * self.car_num + 2:2 * self.region_num + 3 * self.car_num + 2]))
+                                     state[-2 * self.car_num - 1:-self.car_num - 1]))
 
                 for move,region in zip(m,r):
 
@@ -357,6 +375,8 @@ class Dqn():
     def evaluate(self, env, render=False):
         eval_reward = []
         for i in range(1):
+
+            env.eval_flow_init()
             obs = env.init()
             episode_reward = 0
             fore_R=0
@@ -385,23 +405,28 @@ class Dqn():
 
 def main():
     eps_num = 5
-    car_num=2
+    car_num=1
     EPSILON = 0.9
-    EPS_DECAY = 0.995
+    EPS_DECAY = 0.99
     env = Env(region_num=4, move_amount_limit=10, eps_num=eps_num,car_num=car_num)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = 2*env.region_num + 4*car_num+ 2 + 1 #19
+    env.eval_flow_init()
 
 
     net = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num,car_num)
     print("The DQN is collecting experience...")
     step_counter_list = []
     for episode in range(EPISODES):
+        # if episode % 2000 ==0:
+        #     # env.possion_flow_init()
+        #     env.eval_flow_init()
+        #     print(env.out_nums)
         state = env.init()
         step_counter = 0
         reward_sum = 0
         history_action=[]
-        EPSILON = max(EPSILON * EPS_DECAY, 0.01)
+        EPSILON = max(EPSILON * EPS_DECAY, 0.05)
         fore_R=0
         while True:
             step_counter += 1
@@ -430,7 +455,7 @@ def main():
                     # print(f"{round(reward_sum, 3)}", file=open(f"result_history/actionless_output_result_{ts}.txt", "a"))
 
             if done:
-                print("episode {}, the reward is {}, history action {}".format(episode, round(reward_sum, 3),history_action))
+                print("episode {}, the reward is {}, history action {}".format(episode, round(reward_sum/(eps_num-1), 3),history_action))
                 print(f"{round(reward_sum, 3)}", file=open(f"result_history/smalltest_output_result_{ts}.txt", "a"))
                 break
 
