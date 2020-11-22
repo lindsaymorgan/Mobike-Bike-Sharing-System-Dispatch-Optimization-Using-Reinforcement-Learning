@@ -1,0 +1,9 @@
+7 state_vars(curr_state=(6, 20, 0, 5, 2, 0, 0, 0), prev_state_hash=2688785855355268490, reward=-7, move=0, region=0)
+6 state_vars(curr_state=(0, 7, 3, 0, 2, 3, 0, 0), prev_state_hash=70861123798786196, reward=-7, move=3, region=2)
+5 state_vars(curr_state=(0, 7, 0, 0, 0, 3, 3, 0), prev_state_hash=-4735715031427555624, reward=-7, move=5, region=3)
+4 state_vars(curr_state=(2, 6, 3, 3, 0, 1, 3, 5), prev_state_hash=-5982143625190119560, reward=-12, move=-3, region=0)
+3 state_vars(curr_state=(5, 6, 3, 3, 2, 1, 0, 5), prev_state_hash=7318913110704603104, reward=-1, move=-5, region=1)
+2 state_vars(curr_state=(0, 5, 8, 0, 2, 0, 0, 0), prev_state_hash=7179268573077225036, reward=-1, move=5, region=2)
+1 state_vars(curr_state=(0, 5, 3, 0, 0, 0, 5, 0), prev_state_hash=-5449550484817415065, reward=-1, move=0, region=0)
+0 state_vars(curr_state=(6, 12, 12, 7, 0, 0, 5, 0), prev_state_hash=1576075628921353469, reward=-1, move=-5, region=0)
+best reward : -9.25

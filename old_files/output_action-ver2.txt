@@ -1,0 +1,4 @@
+obs:[11 12 12  7  0  0  1  0  5  5  3  0  1  0] t:1 region:1 move:0
+obs:[ 5  5  3  0  1  0  0 -5  5 11  0  3  0  5] t:2 region:0 move:-5
+obs:[ 5 11  0  3  0  5  3  5  3 12  0  0  3  0] t:3 region:3 move:5
+obs:[ 3 12  0  0  3  0  0 -9  0 25  0  5  0  9] t:4 region:0 move:-9
