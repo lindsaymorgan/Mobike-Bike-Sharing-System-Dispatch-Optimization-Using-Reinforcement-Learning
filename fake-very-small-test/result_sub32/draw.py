@@ -1,14 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
-filename='subgraph32_real_output_result_carnum_2_carbatch5_1604414772.txt'
-shift=10
-leng=20000
+filename='sub32_not_equal_start_output_result_move_amount_limit5_1604541475'
+shift=20
+leng=10000
 plt.rcParams['font.sans-serif']=['Arial Unicode MS']
 
 with open(f'{filename}.txt') as f:
     content = f.readlines()
 # you may also want to remove whitespace characters like `\n` at the end of each line
-content = [float(x.strip())/4 for x in content]
+content = [float(x.strip()) for x in content]
 
 mean=[np.mean(content[i:i+shift]) for i in range(leng)]
 

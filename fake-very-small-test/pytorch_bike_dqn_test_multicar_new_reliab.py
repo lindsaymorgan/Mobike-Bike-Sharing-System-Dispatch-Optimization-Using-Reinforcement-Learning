@@ -11,6 +11,7 @@ import copy
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import scipy.stats as stats
+from tqdm import tqdm
 
 # hyper parameters
 # EPSILON = 0.85
@@ -402,7 +403,7 @@ def main():
     net = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num,car_num)
     print("The DQN is collecting experience...")
     step_counter_list = []
-    for episode in range(EPISODES):
+    for episode in tqdm(range(EPISODES)):
         state = env.init()
         step_counter = 0
         reward_sum = 0
