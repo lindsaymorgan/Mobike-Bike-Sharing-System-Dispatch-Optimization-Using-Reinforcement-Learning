@@ -19,4 +19,4 @@ plt.plot([i for i in range(leng)],mean)
 
 plt.xlabel('迭代次数',size=15)
 plt.ylabel('系统服务可靠度',size=15)
-plt.savefig(f'plot_{filename}.jpg')
+# plt.savefig(f'plot_{filename}.jpg')

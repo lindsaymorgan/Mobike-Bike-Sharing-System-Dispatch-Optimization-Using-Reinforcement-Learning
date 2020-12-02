@@ -11,6 +11,7 @@ import copy
 import multiprocessing
 from multiprocessing.pool import ThreadPool
 import scipy.stats as stats
+from tqdm import tqdm
 
 # hyper parameters
 # EPSILON = 0.85
@@ -390,9 +391,11 @@ class Dqn():
         for i in range(1):
             env.eval_flow_init()
             obs = env.init()
+            step_counter = 0
             episode_reward = 0
             fore_R=0
             while True:
+                step_counter += 1
                 action = self.predict(obs,env)  # 预测动作，只选最优动作
                 if env.t%env.car_num!=0:
                     obs, reward, fore_R, done = env.step(action,fore_R)  #记录此阶段R 传入上一阶段R
@@ -406,7 +409,7 @@ class Dqn():
                     f"obs:{obs[:-1]} t:{obs[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
                     f"move:{action % (2 * self.move_amount_limit + 1) - self.move_amount_limit} reward:{reward} "
                     f"reward_sum:{episode_reward}",
-                    file=open(f"result_action/pytorch_car2_output_action_{ts}.txt", "a"))
+                    file=open(f"result_action/flex_test_pytorch_output_action_{ts}.txt", "a"))
                 # if render:
                 #     env.render()
                 if done:
@@ -428,10 +431,8 @@ def main():
     net = Dqn(NUM_STATES, NUM_ACTIONS, env.region_num, env.move_amount_limit, eps_num,car_num)
     print("The DQN is collecting experience...")
     step_counter_list = []
-    for episode in range(EPISODES):
-        if episode % 2000 ==0:
-            env.possion_flow_init()
-            print(env.out_nums)
+    for episode in tqdm(range(EPISODES)):
+        env.possion_flow_init()
         state = env.init()
         step_counter = 0
         reward_sum = 0
@@ -476,7 +477,9 @@ def main():
         if episode % 100 == 0:
             te = time.time()
             print(f'time consume: {te - ts}')
-    print(net.evaluate(env))
+            print(net.evaluate(env)/(eps_num-1),
+                    file=open(f"result_flex_eval/flex_test_eval_smalltest_output_result_move_amount_limit{env.move_amount_limit}_{ts}.txt", "a"))
+    # print(net.evaluate(env))
 
 
 if __name__ == '__main__':

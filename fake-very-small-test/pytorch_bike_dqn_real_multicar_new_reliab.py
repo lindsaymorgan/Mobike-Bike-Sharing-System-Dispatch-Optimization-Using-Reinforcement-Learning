@@ -61,7 +61,7 @@ class Env(object):
 
     def determine_init_state(self):
         region_outheat=[ sum(x) for x in zip(*self.out_nums) ]
-        rate=8500/sum(region_outheat)
+        rate=800/sum(region_outheat)
         self.init_state=[np.ceil(i*rate) for i in region_outheat]
 
     def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法 Todo:check
