@@ -13,7 +13,7 @@ class Env(object):
 
 
     def reset(self):
-        self.obs = np.array([500, 500, 500, 500, 1, 0, 0, 0, 0])
+        self.obs = np.array([2100,2100])
         self.t=0
         out_num = np.array(need.groupby('start_region')[f'{self.t}'].agg(np.sum))
         for i in range(self.region_num):

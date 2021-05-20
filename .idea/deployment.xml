@@ -1,21 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lindsay@hk3.qexw.jq.mk:24213">
     <serverData>
-      <paths name="root@47.115.19.117:22">
+      <paths name="lindsay@hk3.qexw.jq.mk:24213">
         <serverdata>
           <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/lindsay/bike-small-test" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@47.115.19.117:22 (1)">
+      <paths name="root@hk3.qexw.jq.mk:24212">
         <serverdata>
           <mappings>
-            <mapping deploy="/root/usr/lindsay-project/dqn-test" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="root@hk3.qexw.jq.mk:24213">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="root@hk3.qexw.jq.mk:24213 (project level)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
     </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="e4388a45-e044-44e4-b5e5-3a553212dc69" name="root@hk3.qexw.jq.mk:24213 (project level)">
+        <fileTransfer accessType="SFTP" host="hk3.qexw.jq.mk" port="24213" sshConfigId="74c7b5f4-1489-4755-94db-bb02576c537e" sshConfig="root@hk3.qexw.jq.mk:24213 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" keepAliveTimeout="0" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

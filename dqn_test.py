@@ -112,7 +112,7 @@ def main():
         step_counter = 0
         while True:
             step_counter +=1
-            # env.render()
+            env.render()
             action = net.choose_action(state)
             next_state, reward, done, info = env.step(action)
             reward = reward * 100 if reward >0 else reward * 5

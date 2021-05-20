@@ -1,0 +1,4 @@
+obs:[12 11 13  0  0  0  0 -6  0  4  4  0  0  6] t:1 region:0 move:-6 reward:-8.0 reward_sum:-8.0
+obs:[ 0  4  4  0  0  6  0 -3  2 10  0  3  0  9] t:2 region:0 move:-3 reward:-1.0 reward_sum:-9.0
+obs:[ 2 10  0  3  0  9  3  9  0 11  0  0  3  0] t:3 region:3 move:9 reward:-7.8 reward_sum:-16.8
+obs:[ 0 11  0  0  3  0  3 -3  6 24  0  2  3  3] t:4 region:3 move:-3 reward:-3.0 reward_sum:-19.8
