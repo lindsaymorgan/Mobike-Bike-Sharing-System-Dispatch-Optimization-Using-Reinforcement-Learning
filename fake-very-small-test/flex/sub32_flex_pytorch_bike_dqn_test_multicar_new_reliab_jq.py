@@ -21,8 +21,8 @@ MEMORY_CAPACITY = 2000
 Q_NETWORK_ITERATION = 100
 BATCH_SIZE = 32
 
-EPISODES = 200000
-need = pd.read_csv('fake_4region_trip_20170510.csv')
+EPISODES = 20000
+need = pd.read_csv('../subgraph32_real_4region_trip_20170510_5stage.csv')
 ts=int(time.time())
 
 cores = multiprocessing.cpu_count()-1
@@ -42,13 +42,14 @@ class Env(object):
         self.current_car = 0
         self.current_eps = 0
 
-        # self.start_region = need.groupby('start_region')
-        # self.end_region = need.groupby('end_region')
-        # self.t_index = {i: str(i) for i in range(eps_num)}
-        # self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(eps_num)])
-        # self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(eps_num)])
+        self.start_region = need.groupby('start_region')
+        self.end_region = need.groupby('end_region')
+        self.t_index = {i: str(i) for i in range(eps_num)}
+        self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(eps_num)])
+        self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(eps_num)])
 
         self.t = 0
+        self.determine_init_state()
 
         # self.obs_init = np.hstack(([15, 15, 15, 15], [0]*self.car_num, [0]*self.car_num,[0,0],[15, 15, 15, 15], [0]*self.car_num, [0]*self.car_num))# s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
         # self.obs_init[-self.obs_dim:-(2*self.car_num)] -= self.out_nums[0, ]
@@ -63,8 +64,12 @@ class Env(object):
         self.t_index = {i: str(i) for i in range(self.episode_num)}
         self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
         self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
-        self.obs_init = np.hstack(([15, 15, 15, 15], [0] * self.car_num, [0] * self.car_num, [0, 0], [15, 15, 15, 15],
-                                   [0] * self.car_num, [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
+        # self.obs_init = np.hstack((self.init_state, [0] * self.car_num, [0] * self.car_num, [0, 0], self.init_state,
+        #                            [0] * self.car_num, [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
+        # self.obs_init[-self.obs_dim:-(2 * self.car_num)] -= self.out_nums[0,]
+        self.obs_init = np.hstack((copy.deepcopy(self.init_state), [0] * self.car_num, [0] * self.car_num, [0, 0],
+                                   copy.deepcopy(self.init_state), [0] * self.car_num,
+                                   [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
         self.obs_init[-self.obs_dim:-(2 * self.car_num)] -= self.out_nums[0,]
 
     def eval_flow_init(self):   #使用原版need 固定flow 用于评价
@@ -75,8 +80,12 @@ class Env(object):
         self.t_index = {i: str(i) for i in range(self.episode_num)}
         self.out_nums = np.array([self.start_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
         self.in_nums = np.array([self.end_region[str(i)].agg(np.sum) for i in range(self.large_eps_num)])
-        self.obs_init = np.hstack(([15, 15, 15, 15], [0] * self.car_num, [0] * self.car_num, [0, 0], [15, 15, 15, 15],
-                                   [0] * self.car_num, [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
+        # self.obs_init = np.hstack((self.init_state, [0] * self.car_num, [0] * self.car_num, [0, 0], self.init_state,
+        #                            [0] * self.car_num, [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
+        # self.obs_init[-self.obs_dim:-(2 * self.car_num)] -= self.out_nums[0,]
+        self.obs_init = np.hstack((copy.deepcopy(self.init_state), [0] * self.car_num, [0] * self.car_num, [0, 0],
+                                   copy.deepcopy(self.init_state), [0] * self.car_num,
+                                   [0] * self.car_num))  # s:各方格单车量+货车位置+货车上的单车量 a:货车下一位置+货车搬运量
         self.obs_init[-self.obs_dim:-(2 * self.car_num)] -= self.out_nums[0,]
 
 
@@ -85,11 +94,16 @@ class Env(object):
         self.t = 0
         return np.append(self.obs, self.t)
 
+    def determine_init_state(self):
+        region_outheat=[ sum(x) for x in zip(*self.out_nums) ]
+        rate=800/sum(region_outheat)
+        self.init_state=[np.ceil(i*rate) for i in region_outheat]
+
     def check_limit(self,arg):  #对一个state(不含t,14位),action,t(当前)是否合法 Todo:check
         tmp_obs, action, current_car, current_eps =arg
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
-        move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+        move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
 
         #\ and (tmp_obs[-self.obs_dim + region] - self.out_nums[int(current_eps+1), region]) * move <= 0
         if move + tmp_obs[-self.obs_dim + region] >= 0 and move <= tmp_obs[-self.car_num+int(current_car)] :
@@ -173,7 +187,7 @@ class Env(object):
         self.obs[:self.obs_dim]=self.obs[-self.obs_dim:]  #更新状态
 
         region = int(np.floor(action / (2 * self.move_amount_limit + 1)))
-        move = action % (2 * self.move_amount_limit + 1) - self.move_amount_limit
+        move = (action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)*10
 
         # 更新单车分布状态
         # 处理上时段骑入
@@ -456,9 +470,11 @@ class Dqn():
         for i in range(1):
             env.eval_flow_init()
             obs = env.init()
+            step_counter = 0
             episode_reward = 0
             fore_R=0
             while True:
+                step_counter += 1
                 action = self.predict(obs,env)  # 预测动作，只选最优动作
                 if env.t % env.car_num == 0:
                     next_state, reward, raw_R, fore_R, done = env.step(action, fore_R)
@@ -468,12 +484,12 @@ class Dqn():
                     next_state, reward, fore_R, done = env.step(action, fore_R)
 
                 episode_reward += reward
-                print(f"obs:{obs[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{obs[-1]}")
+                print(f"obs:{env.obs} action:{action} reward:{reward} reward_sum:{episode_reward} t:{step_counter}")
                 print(
-                    f"obs:{obs[:-1]} t:{obs[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
-                    f"move:{action % (2 * self.move_amount_limit + 1) - self.move_amount_limit} reward:{reward} "
+                    f"obs:{env.obs} t:{step_counter} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
+                    f"move:{10*(action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)} reward:{reward} "
                     f"reward_sum:{episode_reward}",
-                    file=open(f"result_action/pytorch_car2_output_action_{ts}.txt", "a"))
+                    file=open(f"result_action/sub32_flex_car2_output_action_{ts}.txt", "a"))
                 # if render:
                 #     env.render()
                 if done:
@@ -487,7 +503,7 @@ def main():
     car_num=2
     EPSILON = 0.99
     EPS_DECAY = 0.999
-    env = Env(region_num=4, move_amount_limit=3, eps_num=eps_num,car_num=car_num)
+    env = Env(region_num=9, move_amount_limit=5, eps_num=eps_num,car_num=car_num)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = 2*env.region_num + 4*car_num+ 2 + 1 #19
 
@@ -508,7 +524,7 @@ def main():
             # env.render()
             action = net.choose_action(state,EPSILON,env)
 
-            move = action % (2 * env.move_amount_limit + 1) - env.move_amount_limit
+            move = (action % (2 * env.move_amount_limit + 1) - env.move_amount_limit)*10
             region=int(np.floor(action / (2 * env.move_amount_limit + 1)))
             history_action.append((region,move))
 
@@ -542,7 +558,7 @@ def main():
             te = time.time()
             print(f'time consume: {te - ts}')
             print(net.evaluate(env)/(eps_num-1),
-                    file=open(f"result_flex_eval/flex_eval_smalltest_output_result_move_amount_limit{env.move_amount_limit}_{ts}.txt", "a"))
+                    file=open(f"result_flex_eval/flex_sub32_eval_smalltest_output_result_move_amount_limit{env.move_amount_limit}_{ts}.txt", "a"))
     # print(net.evaluate(env))
 
 

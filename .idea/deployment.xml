@@ -1,25 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" autoUpload="Always">
+  <component name="PublishConfigData" autoUpload="Always" serverName="lindsay@hk3.qexw.jq.mk:24213">
     <serverData>
-      <paths name="aliyun">
-        <serverdata>
-          <mappings>
-            <mapping deploy="/root/usr/lindsay-project/dqn-test" local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="lindsay@10.133.35.118:22">
+      <paths name="lindsay@hk3.qexw.jq.mk:24213">
         <serverdata>
           <mappings>
             <mapping deploy="/home/lindsay/bike-small-test" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="root@47.115.19.117:22">
+      <paths name="root@hk3.qexw.jq.mk:24212">
         <serverdata>
           <mappings>
-            <mapping deploy="/root/usr/lindsay-project/dqn-test" local="$PROJECT_DIR$" />
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" web="/" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="root@hk3.qexw.jq.mk:24213">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
+      <paths name="root@hk3.qexw.jq.mk:24213 (project level)">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/root/bike-small-test" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>

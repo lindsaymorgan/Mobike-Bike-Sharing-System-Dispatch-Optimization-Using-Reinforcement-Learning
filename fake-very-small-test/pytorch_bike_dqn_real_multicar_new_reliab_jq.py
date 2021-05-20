@@ -17,9 +17,9 @@ from tqdm import tqdm
 # EPSILON = 0.85
 GAMMA = 0.99
 LR = 0.001
-MEMORY_CAPACITY = 2000
+MEMORY_CAPACITY = 3000
 Q_NETWORK_ITERATION = 100
-BATCH_SIZE = 64
+BATCH_SIZE = 128
 
 EPISODES = 20000
 # need = pd.read_csv('subgraph32_real_4region_trip_20170510_5stage.csv')
@@ -64,7 +64,7 @@ class Env(object):
 
     def determine_init_state(self):
         region_outheat=[ sum(x) for x in zip(*self.out_nums) ]
-        rate=7500/sum(region_outheat)
+        rate=8000/sum(region_outheat)
         self.init_state=[np.ceil(i*rate) for i in region_outheat]
         # self.init_state =[7500/58]*58
 
@@ -444,24 +444,24 @@ class Dqn():
     def evaluate(self, env, render=False):
         eval_reward = []
         for i in range(1):
-            obs = env.init()
+            next_state = env.init()
             episode_reward = 0
             fore_R=0
             while True:
-                action = self.predict(obs,env)  # 预测动作，只选最优动作
+                action = self.predict(next_state,env)  # 预测动作，只选最优动作
                 if env.t%env.car_num!=0:
-                    obs, reward, fore_R, done = env.step(action,fore_R)  #记录此阶段R 传入上一阶段R
+                    next_state, reward, fore_R, done = env.step(action,fore_R)  #记录此阶段R 传入上一阶段R
                 else:
                     next_state, reward, raw_R, fore_R, done = env.step(action, fore_R)
                     episode_reward += raw_R
 
                 episode_reward += reward
-                print(f"obs:{obs[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{obs[-1]}")
+                print(f"obs:{next_state[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{next_state[-1]}")
                 print(
-                    f"obs:{obs[:-1]} t:{obs[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
+                    f"obs:{next_state[:-1]} t:{next_state[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
                     f"move:{car_batch*(action % (2 * self.move_amount_limit + 1) - self.move_amount_limit)} reward:{reward} "
                     f"reward_sum:{episode_reward}",
-                    file=open(f"result_action/emb50_pytorch_car5_output_action_{ts}.txt", "a"))
+                    file=open(f"final_result/big_real_pytorch_car5_output_action_{ts}_8000.txt", "a"))
                 # if render:
                 #     env.render()
                 if done:
@@ -520,7 +520,7 @@ def main():
 
             if done:
                 print("episode {}, the reward is {}, history action {}".format(episode, round(reward_sum/(eps_num-1), 3),history_action))
-                print(f"{round(reward_sum/(eps_num-1), 3)}", file=open(f"result_real/not_equal_emb50_start_real_output_result_carnum_{car_num}_carbatch{car_batch}_movelimit{env.move_amount_limit}_{ts}.txt", "a"))
+                print(f"{round(reward_sum/(eps_num-1), 3)}", file=open(f"final_result/big_real8000_output_result_carnum_{car_num}_carbatch{car_batch}_movelimit{env.move_amount_limit}_{ts}.txt", "a"))
                 break
 
             state = next_state

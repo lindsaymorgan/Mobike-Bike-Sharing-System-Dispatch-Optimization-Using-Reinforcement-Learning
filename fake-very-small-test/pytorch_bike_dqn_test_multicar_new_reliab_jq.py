@@ -21,7 +21,7 @@ MEMORY_CAPACITY = 2000
 Q_NETWORK_ITERATION = 100
 BATCH_SIZE = 32
 
-EPISODES = 20000
+EPISODES = 10000
 need = pd.read_csv('fake_4region_trip_20170510.csv')
 ts=int(time.time())
 
@@ -428,21 +428,21 @@ class Dqn():
     def evaluate(self, env, render=False):
         eval_reward = []
         for i in range(1):
-            obs = env.init()
+            next_state = env.init()
             episode_reward = 0
             fore_R=0
             while True:
-                action = self.predict(obs,env)  # 预测动作，只选最优动作
+                action = self.predict(next_state,env)  # 预测动作，只选最优动作
                 if env.t%env.car_num!=0:
-                    obs, reward, fore_R, done = env.step(action,fore_R)  #记录此阶段R 传入上一阶段R
+                    next_state, reward, fore_R, done = env.step(action,fore_R)  #记录此阶段R 传入上一阶段R
                 else:
                     next_state, reward, raw_R, fore_R, done = env.step(action, fore_R)
                     episode_reward += raw_R
 
                 episode_reward += reward
-                print(f"obs:{obs[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{obs[-1]}")
+                print(f"obs:{next_state[:-1]} action:{action} reward:{reward} reward_sum:{episode_reward} t:{next_state[-1]}")
                 print(
-                    f"obs:{obs[:-1]} t:{obs[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
+                    f"obs:{next_state[:-1]} t:{next_state[-1]} region:{int(np.floor(action / (2 * self.move_amount_limit + 1)))} "
                     f"move:{action % (2 * self.move_amount_limit + 1) - self.move_amount_limit} reward:{reward} "
                     f"reward_sum:{episode_reward}",
                     file=open(f"result_action/pytorch_car2_output_action_{ts}.txt", "a"))
@@ -456,10 +456,10 @@ class Dqn():
 
 def main():
     eps_num = 5
-    car_num=2
+    car_num=1
     EPSILON = 0.99
     EPS_DECAY = 0.999
-    env = Env(region_num=4, move_amount_limit=3, eps_num=eps_num,car_num=car_num)
+    env = Env(region_num=4, move_amount_limit=5, eps_num=eps_num,car_num=car_num)
     NUM_ACTIONS = (2 * env.move_amount_limit + 1) * env.region_num  # [-500,500]*4个方块
     NUM_STATES = 2*env.region_num + 4*car_num+ 2 + 1 #19
 
